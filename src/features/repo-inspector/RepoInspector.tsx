@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { useNavigate } from 'react-router-dom';
 
 interface InspectionResult {
   path: string;
@@ -12,8 +13,41 @@ interface InspectionResult {
 }
 
 export default function RepoInspector() {
+  const navigate = useNavigate();
   const [result, setResult] = useState<InspectionResult | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleAddCompany = () => {
+    if (!result || !result.path) return;
+    
+    // Suggest an ID and display name from the folder name
+    const parts = result.path.replace(/\\/g, '/').split('/');
+    const folderName = parts[parts.length - 1] || 'naamloos';
+    const suggestedId = folderName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const suggestedName = folderName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    
+    // Get parent directory for workspace root
+    const workspaceRoot = result.path.substring(0, Math.max(result.path.lastIndexOf('/'), result.path.lastIndexOf('\\')));
+
+    const prefill = {
+      id: suggestedId,
+      displayName: suggestedName,
+      workspaceRoots: [workspaceRoot],
+      git: {
+        userName: result.userEmail?.split('@')[0] || '',
+        userEmail: result.userEmail || '',
+      },
+      github: {
+        username: '',
+        hostAlias: `github-${suggestedId}`,
+        sshKeyPath: `~/.ssh/id_ed25519_${suggestedId}`,
+        cloneProtocol: 'ssh'
+      },
+      repositories: result.originUrl ? [result.originUrl] : []
+    };
+
+    navigate('/companies', { state: { prefill } });
+  };
 
   const handleChooseDir = async () => {
     try {
@@ -38,6 +72,36 @@ export default function RepoInspector() {
     } catch (err) {
       console.error('Inspection failed:', err);
       alert('Failed to inspect repository.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFix = async () => {
+    if (!result || !result.path) return;
+    setLoading(true);
+    try {
+      // 1. Get the matching company to find correct credentials
+      const config: any = await invoke('get_config');
+      const company = config.companies.find((c: any) => c.id === result.matchedCompanyId);
+      
+      if (!company) {
+        alert('Kan geen bijbehorend bedrijf vinden om de identiteit van te kopiëren.');
+        return;
+      }
+
+      // 2. Apply fix
+      await invoke('fix_repository_identity', { 
+        repoPath: result.path, 
+        userName: company.git.userName, 
+        userEmail: company.git.userEmail 
+      });
+      
+      // 3. Re-inspect
+      await inspectPath(result.path);
+    } catch (err) {
+      console.error('Fix failed:', err);
+      alert(`Herstel mislukt: ${err}`);
     } finally {
       setLoading(false);
     }
@@ -134,13 +198,16 @@ export default function RepoInspector() {
                     status={result.matchedCompanyId ? "ok" : "warning"} 
                     title="Context" 
                     description={result.matchedCompanyId ? "Pad is beheerd." : "Pad is onbekend."}
+                    onFix={!result.matchedCompanyId ? handleAddCompany : undefined}
+                    fixLabel="Nieuw Bedrijf Toevoegen"
                   />
                   
                   {result.matchedCompanyId && (
                     <DiagnosticCard 
-                      status="ok" 
+                      status={result.userEmail ? "ok" : "error"} 
                       title="Git Identiteit" 
-                      description="Correct ingesteld."
+                      description={result.userEmail ? "Identiteit gevonden." : "Geen lokale identiteit ingesteld."}
+                      onFix={handleFix}
                     />
                   )}
                 </>
@@ -169,7 +236,23 @@ export default function RepoInspector() {
   );
 }
 
-function DiagnosticCard({ status, title, description, current, expected }: { status: 'ok' | 'warning' | 'error', title: string, description: string, current?: string, expected?: string }) {
+function DiagnosticCard({ 
+  status, 
+  title, 
+  description, 
+  current, 
+  expected, 
+  onFix,
+  fixLabel = "Fix Automatisch"
+}: { 
+  status: 'ok' | 'warning' | 'error', 
+  title: string, 
+  description: string, 
+  current?: string, 
+  expected?: string, 
+  onFix?: () => void,
+  fixLabel?: string
+}) {
   const isWarning = status === 'warning';
   const isError = status === 'error';
   const iconName = isError ? 'error' : isWarning ? 'warning' : 'verified';
@@ -202,14 +285,16 @@ function DiagnosticCard({ status, title, description, current, expected }: { sta
             </div>
           )}
           
-          {status !== 'ok' && (
+          {status !== 'ok' && onFix && (
             <div className="mt-4 flex justify-end">
-              <button className={`text-[10px] px-6 py-2.5 rounded-xl font-black font-headline tracking-widest uppercase transition-all shadow-sm active:scale-95 border ${
+              <button 
+                onClick={onFix}
+                className={`text-[10px] px-6 py-2.5 rounded-xl font-black font-headline tracking-widest uppercase transition-all shadow-sm active:scale-95 border ${
                 isError 
-                  ? 'bg-error text-white border-error hover:bg-error-dim shadow-error/20' 
-                  : 'bg-tertiary text-white border-tertiary hover:bg-tertiary-dim shadow-tertiary/20'
+                  ? 'bg-red-600 text-white border-red-600 hover:bg-red-700 shadow-red-600/20' 
+                  : 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700 shadow-amber-600/20'
               }`}>
-                Fix Automatisch
+                {fixLabel}
               </button>
             </div>
           )}

@@ -4,7 +4,7 @@ pub mod domain;
 pub mod store;
 
 use commands::config_commands::{get_config, save_config, export_selected_config, get_config_from_file, import_selected_companies};
-use commands::git_commands::{clone_repository, pull_repository};
+use commands::git_commands::{clone_repository, pull_repository, fix_repository_identity};
 use commands::repo_commands::inspect_repository;
 use commands::engine_commands::{get_proposed_changes, apply_changes};
 use commands::system_commands::{check_system_dependency, get_home_dir};
@@ -38,6 +38,7 @@ pub fn run() {
             import_selected_companies,
             clone_repository,
             pull_repository,
+            fix_repository_identity,
             inspect_repository,
             get_proposed_changes,
             apply_changes,

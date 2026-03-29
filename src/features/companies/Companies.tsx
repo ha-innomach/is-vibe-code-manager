@@ -1,12 +1,27 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
 import CompanyWizard from './CompanyWizard';
+import { useTerminal } from '../../components/TerminalProvider';
 
 const Companies = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
   const [editingCompany, setEditingCompany] = useState<any>(null);
+  const { runCommand, setIsOpen } = useTerminal();
+
+  // Handle pre-fill from Repo Inspector
+  useEffect(() => {
+    if (location.state?.prefill) {
+      setEditingCompany(location.state.prefill);
+      setShowWizard(true);
+      // Clear the state so it doesn't pop up again on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
@@ -36,6 +51,8 @@ const Companies = () => {
       return;
     }
 
+    setIsOpen(true);
+    
     try {
       for (const repoUrl of company.repositories) {
         // Simple logic: derive folder name and check if it exists
@@ -47,17 +64,22 @@ const Companies = () => {
         
         const inspection = await invoke('inspect_repository', { path: fullPath }) as any;
         
+        const hostAlias = company.github.hostAlias;
+        const finalUrl = repoUrl.includes('github.com') 
+          ? repoUrl.replace('github.com', hostAlias) 
+          : repoUrl;
+
         if (inspection.exists && inspection.isGit) {
-          await invoke('pull_repository', { repoPath: fullPath });
+          // git pull
+          await runCommand('git', ['-C', fullPath, 'pull']);
         } else {
-          await invoke('clone_repository', { 
-            companyId: company.id, 
-            repoUrl: repoUrl, 
-            targetParent: root 
-          });
+          // git clone
+          await runCommand('git', ['clone', finalUrl, fullPath]);
         }
+        
+        // Wait a bit between commands for the terminal to breathe
+        await new Promise(r => setTimeout(r, 500));
       }
-      alert('Synchronisatie voltooid!');
       fetchCompanies();
     } catch (err) {
       console.error('Sync failed:', err);

@@ -74,3 +74,47 @@ pub async fn pull_repository(repo_path: String) -> Result<String, String> {
 
     Ok("Successfully pulled".to_string())
 }
+
+#[tauri::command]
+pub async fn fix_repository_identity(
+    repo_path: String,
+    user_name: String,
+    user_email: String
+) -> Result<String, String> {
+    let path = Path::new(&repo_path);
+    if !path.exists() {
+        return Err("Repository path does not exist".to_string());
+    }
+
+    // 1. Set user.name
+    let name_output = Command::new("git")
+        .arg("-C")
+        .arg(&repo_path)
+        .arg("config")
+        .arg("user.name")
+        .arg(&user_name)
+        .output()
+        .map_err(|e| format!("Failed to set git name: {}", e))?;
+
+    if !name_output.status.success() {
+        let stderr = String::from_utf8_lossy(&name_output.stderr);
+        return Err(format!("Git config name failed: {}", stderr));
+    }
+
+    // 2. Set user.email
+    let email_output = Command::new("git")
+        .arg("-C")
+        .arg(&repo_path)
+        .arg("config")
+        .arg("user.email")
+        .arg(&user_email)
+        .output()
+        .map_err(|e| format!("Failed to set git email: {}", e))?;
+
+    if !email_output.status.success() {
+        let stderr = String::from_utf8_lossy(&email_output.stderr);
+        return Err(format!("Git config email failed: {}", stderr));
+    }
+
+    Ok("Identiteit succesvol hersteld.".to_string())
+}

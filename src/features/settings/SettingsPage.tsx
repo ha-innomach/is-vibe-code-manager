@@ -1,11 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 
+interface AppSettings {
+  backupsDir: string;
+  defaultEnvProvider: string;
+  manageSshConfig: boolean;
+  manageGitConfig: boolean;
+  autoVerifyAfterApply: boolean;
+}
+
+interface AppConfig {
+  version: number;
+  settings: AppSettings;
+  companies: any[];
+}
+
 export default function SettingsPage() {
-  const [backupDir, setBackupDir] = useState('~/.dev-context-manager/backups');
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const currentConfig = await invoke<AppConfig>('get_config');
+        setConfig(currentConfig);
+      } catch (err) {
+        console.error('Failed to fetch config:', err);
+      }
+    };
+    fetchConfig();
+  }, []);
 
   const handleBrowseBackupDir = async () => {
+    if (!config) return;
     try {
       const homeDir = await invoke('get_home_dir');
       const selected = await open({
@@ -14,13 +43,53 @@ export default function SettingsPage() {
         defaultPath: homeDir as string
       });
       if (selected && typeof selected === 'string') {
-        setBackupDir(selected);
+        setConfig({
+          ...config,
+          settings: {
+            ...config.settings,
+            backupsDir: selected
+          }
+        });
       }
     } catch (err) {
       console.error('Failed to open backup directory dialog:', err);
     }
   };
 
+  const handleToggle = (field: keyof AppSettings) => {
+    if (!config) return;
+    setConfig({
+      ...config,
+      settings: {
+        ...config.settings,
+        [field]: !config.settings[field]
+      }
+    });
+  };
+
+  const handleSave = async () => {
+    if (!config) return;
+    setIsSaving(true);
+    setSaveSuccess(false);
+    try {
+      await invoke('save_config', { newConfig: config });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to save config:', err);
+      alert('Fout bij opslaan: ' + err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!config) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto p-6 scroll-smooth">
@@ -31,9 +100,15 @@ export default function SettingsPage() {
             <p className="text-[11px] text-slate-500 font-medium opacity-70">Beheer systeemlocaties en voorkeuren.</p>
           </div>
           
-          <button className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-[12px] font-bold rounded shadow-md shadow-blue-500/10 hover:bg-blue-700 active:scale-95 transition-all">
-            <span className="material-symbols-outlined text-base">save</span>
-            Opslaan
+          <button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className={`flex items-center gap-2 px-4 py-1.5 ${saveSuccess ? 'bg-green-600' : 'bg-blue-600'} text-white text-[12px] font-bold rounded shadow-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-50`}
+          >
+            <span className="material-symbols-outlined text-base">
+              {isSaving ? 'sync' : saveSuccess ? 'check' : 'save'}
+            </span>
+            {isSaving ? 'Bezig...' : saveSuccess ? 'Opgeslagen!' : 'Opslaan'}
           </button>
         </div>
 
@@ -51,7 +126,7 @@ export default function SettingsPage() {
                   <input 
                     type="text" 
                     className="flex-1 bg-slate-50 border border-slate-200 rounded px-3 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 transition-all font-mono text-[12px] shadow-inner" 
-                    value={backupDir}
+                    value={config.settings.backupsDir}
                     readOnly 
                   />
                   <button 
@@ -67,17 +142,20 @@ export default function SettingsPage() {
                 <ToggleRow 
                   title="SSH Configureren" 
                   description="Beheer ~/.ssh/config markers"
-                  checked={true} 
+                  checked={config.settings.manageSshConfig} 
+                  onToggle={() => handleToggle('manageSshConfig')}
                 />
                 <ToggleRow 
                   title="Git Configureren" 
                   description="Beheer ~/.gitconfig markers"
-                  checked={true} 
+                  checked={config.settings.manageGitConfig} 
+                  onToggle={() => handleToggle('manageGitConfig')}
                 />
                 <ToggleRow 
                   title="Automatisering" 
                   description="Gezondheidscheck na updates"
-                  checked={true} 
+                  checked={config.settings.autoVerifyAfterApply} 
+                  onToggle={() => handleToggle('autoVerifyAfterApply')}
                 />
               </div>
             </div>
@@ -88,9 +166,9 @@ export default function SettingsPage() {
   );
 }
 
-function ToggleRow({ title, description, checked }: { title: string, description: string, checked: boolean }) {
+function ToggleRow({ title, description, checked, onToggle }: { title: string, description: string, checked: boolean, onToggle: () => void }) {
   return (
-    <div className="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg border border-slate-100 transition-all hover:bg-slate-50">
+    <div className="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg border border-slate-100 transition-all hover:bg-slate-50 cursor-pointer" onClick={onToggle}>
       <div className="flex items-center gap-4">
         <div className={`w-8 h-8 rounded bg-white flex items-center justify-center border border-slate-100 shadow-sm ${checked ? 'text-blue-500' : 'text-slate-400 opacity-40'}`}>
           <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -102,14 +180,20 @@ function ToggleRow({ title, description, checked }: { title: string, description
           <p className="text-[10px] text-slate-500 font-medium opacity-70">{description}</p>
         </div>
       </div>
-      <Toggle checked={checked} />
+      <Toggle checked={checked} onChange={onToggle} />
     </div>
   );
 }
 
-function Toggle({ checked }: { checked: boolean }) {
+function Toggle({ checked, onChange }: { checked: boolean, onChange: () => void }) {
   return (
-    <div className={`w-10 h-5 rounded-full flex items-center p-0.5 cursor-pointer transition-all duration-300 ${checked ? 'bg-blue-600 border-blue-700' : 'bg-slate-200 border-slate-300'} border`}>
+    <div 
+      className={`w-10 h-5 rounded-full flex items-center p-0.5 cursor-pointer transition-all duration-300 ${checked ? 'bg-blue-600 border-blue-700' : 'bg-slate-200 border-slate-300'} border`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange();
+      }}
+    >
       <div className={`bg-white w-3.5 h-3.5 rounded-full shadow-sm transform transition-all duration-300 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
     </div>
   );

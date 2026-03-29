@@ -114,35 +114,35 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
       <TerminalDrawer />
       
       {/* Sidebar - macOS Style */}
-      <aside className="w-64 flex flex-col pt-12 pb-6 bg-[#f6f6f6]/80 backdrop-blur-3xl border-r border-[#d1d1d6]/50 z-20 transition-all select-none">
-        <div className="px-5 mb-5 flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <span className="material-symbols-outlined text-white text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>hub</span>
+      <aside className="w-56 flex flex-col pt-8 pb-4 bg-[#f6f6f6]/80 backdrop-blur-3xl border-r border-[#d1d1d6]/50 z-20 transition-all select-none">
+        <div className="px-4 mb-4 flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <span className="material-symbols-outlined text-white text-base" style={{ fontVariationSettings: "'FILL' 1" }}>hub</span>
           </div>
           <div className="flex flex-col">
-            <h1 className="text-[13px] font-bold text-slate-900 tracking-tight leading-none">Improvers Studio Vibe Code</h1>
-            <p className="text-[9px] text-slate-400 font-medium tracking-tight mt-0.5 uppercase opacity-60">v0.1.0</p>
+            <h1 className="text-[12px] font-bold text-slate-900 tracking-tight leading-none">Vibe Code Manager</h1>
+            <p className="text-[8px] text-slate-400 font-medium tracking-tight mt-0.5 uppercase opacity-60">v0.1.0</p>
           </div>
         </div>
         
-        <nav className="flex-1 px-3 space-y-0.5 mt-2">
+        <nav className="flex-1 px-2 space-y-0.5 mt-1">
           <NavItem to="/dashboard" icon="dashboard" label="Overzicht" />
           <NavItem to="/companies" icon="business" label="Bedrijven" />
           <NavItem to="/repos" icon="code" label="Repositories" />
-          <div className="h-px bg-slate-200/40 my-3 mx-3"></div>
+          <div className="h-px bg-slate-200/40 my-2 mx-3"></div>
           <NavItem to="/preview" icon="rocket_launch" label="Toepassen" />
           <NavItem to="/doctor" icon="health_and_safety" label="Dokter" />
           <NavItem to="/settings" icon="settings" label="Instellingen" />
         </nav>
 
-        <div className="mx-3 mb-3 p-3 rounded-lg bg-white/40 border border-[#d1d1d6]/30 shadow-sm">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center border border-slate-300/50 overflow-hidden">
-              <span className="material-symbols-outlined text-slate-500 text-sm">person</span>
+        <div className="mx-2 mb-2 p-2 rounded-lg bg-white/40 border border-[#d1d1d6]/30 shadow-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center border border-slate-300/50 overflow-hidden">
+              <span className="material-symbols-outlined text-slate-500 text-xs">person</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold text-slate-900 truncate tracking-tight">Vibe Manager</p>
-              <p className="text-[8px] text-slate-400 font-medium uppercase tracking-widest opacity-60">ADMINISTRATOR</p>
+              <p className="text-[10px] font-bold text-slate-900 truncate tracking-tight">Vibe Manager</p>
+              <p className="text-[7px] text-slate-400 font-medium uppercase tracking-widest opacity-60">ADMINISTRATOR</p>
             </div>
           </div>
         </div>
@@ -151,11 +151,11 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
         {/* Toolbar - macOS Style */}
-          <header className="h-12 flex items-center justify-between px-6 bg-white/80 backdrop-blur-md border-b border-[#d1d1d6]/30 z-10 transition-all">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 group cursor-help relative px-2 py-1 rounded bg-emerald-50 border border-emerald-100">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Sync Actief</span>
+          <header className="h-10 flex items-center justify-between px-5 bg-white/80 backdrop-blur-md border-b border-[#d1d1d6]/30 z-10 transition-all">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 group cursor-help relative px-2 py-0.5 rounded bg-emerald-50 border border-emerald-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600">Sync Actief</span>
                 
                 <div className="absolute top-full left-0 mt-2 w-72 p-4 bg-white border border-slate-200 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-[12px] font-medium leading-relaxed text-slate-600">
                   <p className="mb-2 font-bold text-slate-900">Magische Sync</p>
@@ -189,7 +189,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
           </header>
 
         {/* Content Container */}
-        <main className="flex-1 overflow-hidden bg-white">
+        <main className="flex-1 overflow-y-auto bg-white custom-scrollbar">
           {children}
         </main>
       </div>
