@@ -40,9 +40,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__ # tauri-action replaces this with the app version from tauri.conf.json
-          releaseName: "IS Vibe Code Manager v__VERSION__"
+          tagName: ${{ github.ref_name }}
+          releaseName: "IS Vibe Code Manager ${{ github.ref_name }}"
           releaseBody: "Zie de bijgevoegde bestanden voor de nieuwe release van de Improvers Studio Vibe Code Manager."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
