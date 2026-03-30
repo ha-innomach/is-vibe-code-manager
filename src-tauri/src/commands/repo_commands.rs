@@ -74,3 +74,57 @@ pub async fn inspect_repository(
 
     Ok(result)
 }
+#[tauri::command]
+pub async fn fetch_gh_repos(org: String) -> Result<Vec<serde_json::Value>, String> {
+    let output = std::process::Command::new("gh")
+        .arg("repo")
+        .arg("list")
+        .arg(&org)
+        .arg("--limit")
+        .arg("100")
+        .arg("--json")
+        .arg("url,name")
+        .output()
+        .map_err(|e| format!("Failed to execute gh: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("GitHub CLI error: {}", stderr));
+    }
+
+    let repos: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)
+        .map_err(|e| format!("Failed to parse JSON output: {}", e))?;
+
+    Ok(repos)
+}
+
+#[tauri::command]
+pub async fn scan_local_workspace(root: String) -> Result<Vec<String>, String> {
+    let mut repos = Vec::new();
+    let root_path = std::path::Path::new(&root);
+
+    if !root_path.exists() {
+        return Err(format!("Workspace root does not exist: {}", root));
+    }
+
+    let entries = std::fs::read_dir(root_path)
+        .map_err(|e| format!("Failed to read directory: {}", e))?;
+
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let path = entry.path();
+            if path.is_dir() {
+                // Check if it's a git repo
+                if let Ok(repo) = Repository::open(&path) {
+                    if let Ok(remote) = repo.find_remote("origin") {
+                        if let Some(url) = remote.url() {
+                            repos.push(url.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(repos)
+}

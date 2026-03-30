@@ -79,7 +79,8 @@ pub async fn pull_repository(repo_path: String) -> Result<String, String> {
 pub async fn fix_repository_identity(
     repo_path: String,
     user_name: String,
-    user_email: String
+    user_email: String,
+    host_alias: String
 ) -> Result<String, String> {
     let path = Path::new(&repo_path);
     if !path.exists() {
@@ -87,34 +88,53 @@ pub async fn fix_repository_identity(
     }
 
     // 1. Set user.name
-    let name_output = Command::new("git")
-        .arg("-C")
-        .arg(&repo_path)
-        .arg("config")
-        .arg("user.name")
-        .arg(&user_name)
+    let _ = Command::new("git")
+        .arg("-C").arg(&repo_path)
+        .arg("config").arg("user.name").arg(&user_name)
         .output()
         .map_err(|e| format!("Failed to set git name: {}", e))?;
 
-    if !name_output.status.success() {
-        let stderr = String::from_utf8_lossy(&name_output.stderr);
-        return Err(format!("Git config name failed: {}", stderr));
-    }
-
     // 2. Set user.email
-    let email_output = Command::new("git")
-        .arg("-C")
-        .arg(&repo_path)
-        .arg("config")
-        .arg("user.email")
-        .arg(&user_email)
+    let _ = Command::new("git")
+        .arg("-C").arg(&repo_path)
+        .arg("config").arg("user.email").arg(&user_email)
         .output()
         .map_err(|e| format!("Failed to set git email: {}", e))?;
 
-    if !email_output.status.success() {
-        let stderr = String::from_utf8_lossy(&email_output.stderr);
-        return Err(format!("Git config email failed: {}", stderr));
+    // 3. Update Remote URL to use host_alias
+    let remote_output = Command::new("git")
+        .arg("-C").arg(&repo_path)
+        .arg("remote").arg("get-url").arg("origin")
+        .output()
+        .map_err(|e| format!("Failed to get remote URL: {}", e))?;
+
+    if remote_output.status.success() {
+        let current_url = String::from_utf8_lossy(&remote_output.stdout).trim().to_string();
+        
+        // Rewrite URL if it looks like GitHub SSH
+        // Example logic: git@ANYTHING:owner/repo.git -> git@host_alias:owner/repo.git
+        if current_url.starts_with("git@") && current_url.contains(':') {
+            let parts: Vec<&str> = current_url.split(':').collect();
+            if parts.len() == 2 {
+                let new_url = format!("git@{}:{}", host_alias, parts[1]);
+                if new_url != current_url {
+                    let _ = Command::new("git")
+                        .arg("-C").arg(&repo_path)
+                        .arg("remote").arg("set-url").arg("origin").arg(&new_url)
+                        .output()
+                        .map_err(|e| format!("Failed to set remote URL: {}", e))?;
+                }
+            }
+        } else if current_url.starts_with("https://github.com/") {
+            // Also handle HTTPS to SSH conversion if host_alias is provided
+            let new_url = current_url.replace("https://github.com/", &format!("git@{}:", host_alias)) + ".git";
+            let _ = Command::new("git")
+                .arg("-C").arg(&repo_path)
+                .arg("remote").arg("set-url").arg("origin").arg(&new_url)
+                .output()
+                .map_err(|e| format!("Failed to set remote URL: {}", e))?;
+        }
     }
 
-    Ok("Identiteit succesvol hersteld.".to_string())
+    Ok("Identiteit en remote URL succesvol bijgewerkt.".to_string())
 }

@@ -58,3 +58,27 @@ pub fn get_home_dir() -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+pub fn check_file_exists(path: String) -> Result<bool, String> {
+    let expanded_path = if path.starts_with('~') {
+        match dirs::home_dir() {
+            Some(home) => path.replacen('~', &home.to_string_lossy(), 1),
+            None => return Err("Could not expand home directory".to_string()),
+        }
+    } else {
+        path
+    };
+    Ok(std::path::Path::new(&expanded_path).exists())
+}#[tauri::command]
+pub fn read_text_file(path: String) -> Result<String, String> {
+    let expanded_path = if path.starts_with('~') {
+        match dirs::home_dir() {
+            Some(home) => path.replacen('~', &home.to_string_lossy(), 1),
+            None => return Err("Could not expand home directory".to_string()),
+        }
+    } else {
+        path
+    };
+    std::fs::read_to_string(&expanded_path)
+        .map_err(|e| format!("Failed to read file: {}", e))
+}

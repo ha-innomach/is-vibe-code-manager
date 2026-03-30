@@ -135,6 +135,89 @@ export default function CompanyWizard({ onCancel, initialData }: { onCancel?: ()
     }
   };
 
+  const handleScanGithub = async () => {
+    // Attempt to extract org from existing repositories or ID
+    let org = formData.id.split('-')[0]; // fallback
+    if (formData.repositories[0]) {
+      const match = formData.repositories[0].match(/[:/]([^/]+)\/[^/]+$/);
+      if (match) org = match[1];
+    }
+
+    if (!org) {
+      alert("Voer eerst een Bedrijfs-ID of een Repository URL in om de organisatie te bepalen.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const repos: any[] = await invoke('fetch_gh_repos', { org });
+      const newUrls = repos.map(r => r.url.replace('https://github.com/', 'git@github.com:') + '.git');
+      
+      // Merge with existing
+      const currentUrls = new Set(formData.repositories);
+      const combined = [...formData.repositories];
+      
+      newUrls.forEach(url => {
+        if (!currentUrls.has(url)) combined.push(url);
+      });
+
+      if (combined.length > formData.repositories.length) {
+        setFormData({ ...formData, repositories: combined });
+      } else {
+        alert("Geen nieuwe repositories gevonden.");
+      }
+    } catch (err) {
+      console.error('Fetch failed:', err);
+      alert(`GitHub scan mislukt: ${err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleScanLocal = async () => {
+    if (!formData.workspaceRoots[0]) {
+      alert("Selecteer eerst een Workspace Root Map.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const root = formData.workspaceRoots[0];
+      const localRepos: string[] = await invoke('scan_local_workspace', { root });
+      
+      const companyHint = formData.id.split('-')[0].toLowerCase();
+      const filtered = localRepos.filter(url => {
+        if (!url) return false;
+        const lowerUrl = url.toLowerCase();
+        return lowerUrl.includes(companyHint) || (formData.displayName && lowerUrl.includes(formData.displayName.toLowerCase().replace(/\s/g, '')));
+      });
+
+      const currentUrls = new Set(formData.repositories);
+      const combined = [...formData.repositories];
+      
+      let addedCount = 0;
+      filtered.forEach(url => {
+        const normUrl = url.replace('https://github.com/', 'git@github.com:');
+        if (!currentUrls.has(normUrl)) {
+          combined.push(normUrl);
+          addedCount++;
+        }
+      });
+
+      if (addedCount > 0) {
+        setFormData({ ...formData, repositories: combined });
+        alert(`${addedCount} nieuwe lokale repositories toegevoegd aan de lijst.`);
+      } else {
+        alert("Geen nieuwe relevante lokale repositories gevonden in de geselecteerde map.");
+      }
+    } catch (err) {
+      console.error('Local scan failed:', err);
+      alert(`Lokale scan mislukt: ${err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const nextStep = () => {
     if (step === 5) {
       handleFinish();
@@ -288,7 +371,27 @@ export default function CompanyWizard({ onCancel, initialData }: { onCancel?: ()
               </div>
               
               <div className="col-span-2 pt-4 border-t border-outline-variant/10">
-                <label className="block text-[10px] font-label uppercase tracking-widest text-on-surface-variant mb-1 pl-1">Git Repositories (URLs)</label>
+                <div className="flex items-center justify-between mb-1 pl-1">
+                  <label className="block text-[10px] font-label uppercase tracking-widest text-on-surface-variant">Git Repositories (URLs)</label>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={handleScanLocal}
+                      disabled={loading}
+                      className="text-[10px] text-slate-500 font-bold hover:text-primary flex items-center gap-1 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">folder_shared</span>
+                      Scan Lokaal
+                    </button>
+                    <button 
+                      onClick={handleScanGithub}
+                      disabled={loading}
+                      className="text-[10px] text-primary font-bold hover:underline flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-sm">cloud_sync</span>
+                      Scan GitHub Org
+                    </button>
+                  </div>
+                </div>
                 <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
                   {(formData.repositories || []).map((repo: string, idx: number) => (
                     <div key={idx} className="flex gap-2">

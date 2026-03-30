@@ -5,9 +5,9 @@ pub mod store;
 
 use commands::config_commands::{get_config, save_config, export_selected_config, get_config_from_file, import_selected_companies};
 use commands::git_commands::{clone_repository, pull_repository, fix_repository_identity};
-use commands::repo_commands::inspect_repository;
+use commands::repo_commands::{inspect_repository, fetch_gh_repos, scan_local_workspace};
 use commands::engine_commands::{get_proposed_changes, apply_changes};
-use commands::system_commands::{check_system_dependency, get_home_dir};
+use commands::system_commands::{check_system_dependency, get_home_dir, check_file_exists, read_text_file};
 use commands::terminal_commands::run_terminal_command;
 use store::config_store::load_config;
 
@@ -31,6 +31,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            fetch_gh_repos,
+            scan_local_workspace,
+            check_file_exists,
+            read_text_file,
             get_config, 
             save_config, 
             export_selected_config,
