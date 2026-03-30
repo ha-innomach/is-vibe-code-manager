@@ -64,18 +64,19 @@ const Companies = () => {
       const generate = window.confirm(`De SSH-sleutel voor ${company.displayName} ontbreekt (${company.github.sshKeyPath}).\n\nWil je deze nu genereren?`);
       if (generate) {
         setIsOpen(true);
-        const home: string = await invoke('get_home_dir');
-        const fullPath = company.github.sshKeyPath.replace('~', home);
         const email = company.git.userEmail || "dev@example.com";
-        
-        await runCommand('ssh-keygen', [
-          '-t', 'ed25519', 
-          '-C', email, 
-          '-f', fullPath
-        ]);
-        
-        // Give it a moment, then re-check
-        setTimeout(() => fetchCompanies(), 2000);
+        try {
+          const result: string = await invoke('generate_ssh_key', { 
+            path: company.github.sshKeyPath, 
+            email: email 
+          });
+          alert(result);
+          // Give it a moment, then re-check
+          setTimeout(() => fetchCompanies(), 2000);
+        } catch (err) {
+          console.error('Failed to generate SSH key:', err);
+          alert(`Kon SSH-sleutel niet genereren: ${err}`);
+        }
         return;
       }
     }

@@ -460,14 +460,16 @@ export default function RepoInspector() {
                       title="SSH Sleutel Ontbreekt" 
                       description={`De geconfigureerde SSH-sleutel voor ${matchedCompany.displayName} is niet gevonden: ${matchedCompany.github.sshKeyPath}`}
                       onFix={async () => {
-                        const home: string = await invoke('get_home_dir');
-                        const fullPath = matchedCompany.github.sshKeyPath.replace('~', home);
-                        setIsOpen(true);
-                        runCommand('ssh-keygen', [
-                          '-t', 'ed25519', 
-                          '-C', matchedCompany.git.userEmail || 'dev@example.com', 
-                          '-f', fullPath
-                        ]);
+                        try {
+                          const result: string = await invoke('generate_ssh_key', { 
+                            path: matchedCompany.github.sshKeyPath, 
+                            email: matchedCompany.git.userEmail || 'dev@example.com' 
+                          });
+                          alert(result);
+                        } catch (err) {
+                          console.error('Failed to generate SSH key:', err);
+                          alert(`Kon SSH-sleutel niet genereren: ${err}`);
+                        }
                       }}
                       fixLabel="Sleutel Genereren"
                     />

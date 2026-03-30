@@ -82,3 +82,41 @@ pub fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&expanded_path)
         .map_err(|e| format!("Failed to read file: {}", e))
 }
+
+#[tauri::command]
+pub async fn generate_ssh_key(path: String, email: String) -> Result<String, String> {
+    let expanded_path = if path.starts_with('~') {
+        match dirs::home_dir() {
+            Some(home) => path.replacen('~', &home.to_string_lossy(), 1),
+            None => return Err("Could not expand home directory".to_string()),
+        }
+    } else {
+        path
+    };
+
+    let p = std::path::Path::new(&expanded_path);
+    
+    // Ensure parent directory exists (usually .ssh)
+    if let Some(parent) = p.parent() {
+        if !parent.exists() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+    }
+
+    // Run ssh-keygen
+    // -N "" ensures no passphrase is asked (completely automated)
+    let output = Command::new("ssh-keygen")
+        .arg("-t").arg("ed25519")
+        .arg("-C").arg(&email)
+        .arg("-f").arg(&expanded_path)
+        .arg("-N").arg("")
+        .output()
+        .map_err(|e| format!("Failed to execute ssh-keygen: {}. Ensure OpenSSH is installed.", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("ssh-keygen failed: {}", stderr));
+    }
+
+    Ok(format!("SSH-sleutel succesvol gegenereerd op {}", expanded_path))
+}
